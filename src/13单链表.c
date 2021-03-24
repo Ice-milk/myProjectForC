@@ -22,7 +22,7 @@
 struct Link
 {
   // 序号
-  int count;
+  int id;
   // 数据
   int num;
   // 指向下一个链表元素
@@ -47,9 +47,12 @@ void release(struct Link **);
  */
 void input_data(struct Link *new_num)
 {
-  static int count = 0;
-  new_num->count = count;
-  count++;
+  static int id = 1;
+  if (new_num->id == 0)
+  {
+    new_num->id = id;
+  }
+  id++;
   printf("请输入要存放的数字：\n");
   printf("num = ");
   scanf("%d", &(new_num->num));
@@ -71,7 +74,7 @@ void add_element_h(struct Link **head)
   struct Link *new_num = NULL, *temp = NULL;
 
   // 新建的数据不能放在栈空间，要存放在堆空间，否则函数结束值就丢失了
-  new_num = (struct Link *)malloc(sizeof(struct Link));
+  new_num = (struct Link *)calloc(1,sizeof(struct Link));
   if (NULL == new_num)
   {
     printf("内存分配失败，按任意键程序退出...");
@@ -106,7 +109,7 @@ void add_element_t(struct Link **head)
 {
   struct Link *new_num = NULL;
   static struct Link *tail = NULL;
-  new_num = (struct Link *)malloc(sizeof(struct Link));
+  new_num = (struct Link *)calloc(1,sizeof(struct Link));
   if (NULL == new_num)
   {
     printf("内存分配失败，按任意键退出...\n");
@@ -140,7 +143,7 @@ struct Link *search_item(int key, struct Link *head)
   struct Link *temp = head;
   while (NULL != temp)
   {
-    if (temp->count == key || temp->num == key)
+    if (temp->id == key || temp->num == key)
     {
       return temp;
     }
@@ -150,14 +153,135 @@ struct Link *search_item(int key, struct Link *head)
   printf("完毕\n");
   return NULL;
 }
+
 /**
- * @brief 前插入元素
+ * @brief 在id号前插入元素
  * 
- * @param count 链表元素序号
+ * @param id 链表元素序号
  * @param head 链表头指针
  */
-void inseart_element_h(int count, struct Link *head)
+void insert_element(int id, struct Link **head)
 {
+  struct Link *prev = NULL;
+  struct Link *curr = *head;
+  struct Link *new;
+
+  while(NULL != curr && curr->id != id)
+  {
+    prev = curr;
+    curr = curr->next;
+  } 
+  
+  new = (struct Link *)calloc(1, sizeof(struct Link));
+  if(NULL ==new)
+  {
+    printf("内存分配失败，按任意键结束...");
+    getchar();
+    exit(-1);
+  }
+  input_data(new);
+
+  if (curr ==NULL)
+  {
+    printf("没有对应id的元素，将在链表末尾插入新的值\n");
+  }
+  
+  if (prev == NULL)
+  {
+    *head = new;
+  }
+  else
+  {
+    prev->next = new;
+  }
+  new->next = curr;
+
+  printf("插入成功！新插入元素为：\nprev:");
+  print_element(prev);
+  printf("new :");
+  print_element(new);
+  printf("curr:");
+  print_element(curr);
+}
+
+/**
+ * @brief 改变某个元素的值
+ * 
+ * @param id 元素id
+ * @param head 链表头指针
+ */
+void change_item(int id, struct Link *head)
+{
+  struct Link *temp = head;
+  while(temp != NULL && temp->id != id)
+  {
+    temp = temp->next;
+  }
+  if(temp == NULL)
+  {
+    printf("没有找到对应的元素\n");
+  }
+  else
+  {
+    printf("原元素的值为：\n");
+    print_element(temp);
+    printf("请输入新的值：\n");
+    input_data(temp);
+  }
+  printf("修改完毕，元素已改为：");
+  print_element(temp);
+}
+
+/**
+ * @brief 删除id对应的元素
+ * 
+ * @param id 元素id
+ * @param head 链表首地址
+ */
+void delete_element(int id, struct Link **head)
+{
+  struct Link *prev = NULL;
+  struct Link *curr = *head;
+
+  while(curr != NULL && curr->id != id)
+  {
+    prev = curr;
+    curr = curr->next;
+  }
+
+  if(prev == NULL && curr != NULL)
+  {
+    curr = curr->next;
+    free(*head);
+    *head =curr;
+  }
+  else if(curr == NULL)
+  {
+    printf("没有找到id对应的元素\n");
+  }
+  else
+  {
+    prev->next = curr->next;
+    free(curr);
+  }
+  printf("删除成功\n");
+}
+
+/**
+ * @brief 打印单个元素内容
+ * 
+ * @param element 链表某个元素的指针
+ */
+void print_element(struct Link *element)
+{
+  if(NULL == element)
+  {
+    printf("NULL\n");
+  }
+  else
+  {
+    printf("%p: {%d : %d} -> %p \n", element, element->id, element->num, element->next);
+  }
 }
 
 /**
@@ -170,10 +294,9 @@ void print_all(struct Link *head)
   struct Link *temp = head;
   while (temp != NULL)
   {
-    printf("%d : %d ->\n", temp->count, temp->num);
+    print_element(temp);
     temp = temp->next;
   }
-  printf("NULL\n");
 }
 
 /**
@@ -202,16 +325,15 @@ int main(void)
     printf("请输入对应数字：\n\
             1、添加新元素（头插法）\n\
             2、添加新元素（尾插法）\n\
-            3、*插入元素（前插入）\n\
-            4、*插入元素（后插入）\n\
-            5、*更改某个元素的数据项\n\
-            6、*删除某个元素\n\
-            7、查询数据项\n\
-            8、打印整个链表\n\
+            3、插入元素\n\
+            4、更改某个元素的数据项\n\
+            5、删除某个元素\n\
+            6、查询数据项\n\
+            7、打印整个链表\n\
             0、退出程序\n");
     scanf("%d", &num);
     getchar(); // 丢弃换行符，以免影响后面输入
-    
+
     switch (num)
     {
     case 0:
@@ -221,13 +343,13 @@ int main(void)
       {
         // 因为函数中要修改的是head指针本身的值，所以需要传head指针的地址
         add_element_h(&head);
-        
+
         char c;
         printf("是否继续添加新的元素？y or n\n");
         do
         {
           c = getchar();
-        }while('y' != c && 'Y' != c && 'n' != c && 'N' != c);
+        } while ('y' != c && 'Y' != c && 'n' != c && 'N' != c);
 
         if (c == 'y' || c == 'Y')
         {
@@ -241,17 +363,17 @@ int main(void)
       break;
 
     case 2:
-     while (1)
+      while (1)
       {
         // 因为函数中要修改的是head指针本身的值，所以需要传head指针的地址
         add_element_t(&head);
-        
+
         char c;
         printf("是否继续添加新的元素？y or n\n");
         do
         {
           c = getchar();
-        }while('y' != c && 'Y' != c && 'n' != c && 'N' != c);
+        } while ('y' != c && 'Y' != c && 'n' != c && 'N' != c);
 
         if (c == 'y' || c == 'Y')
         {
@@ -265,42 +387,19 @@ int main(void)
       break;
 
     case 3:
-      break;
-
-    case 4:
-      break;
-
-    case 5:
-
-      break;
-
-    case 6:
-      break;
-
-    case 7:
       while (1)
       {
-        int key;
-        _Bool is_NULL = 1;
-        struct Link *search = head;
-        printf("输入查询的值：\n");
-        scanf("%d", &key);
-        getchar();
-         printf("查询到的信息为：\n");
-        while (NULL != (search = search_item(key, search)))
-        {
-          printf(" %d : %d\n", search->count, search->num);
-          search = search->next;
-          is_NULL = 0;
-        }
-        if(is_NULL) printf("没有对应的信息\n");
-        
+        int id;
+        printf("在id位置前插入数据，请输入id：");
+        scanf("%d", &id);
+        insert_element(id, &head);
+
         char c;
-        printf("是否继续查询？y or n\n");
+        printf("是否继续插入元素？y or n\n");
         do
         {
           c = getchar();
-        }while('y' != c && 'Y' != c && 'n' != c && 'N' != c);
+        } while ('y' != c && 'Y' != c && 'n' != c && 'N' != c);
 
         if (c == 'y' || c == 'Y')
         {
@@ -313,7 +412,103 @@ int main(void)
       }
       break;
 
-    case 8:
+    case 4:
+      while (1)
+      {
+        int id;
+        printf("请输入要更改的元素id：");
+        scanf("%d", &id);
+        change_item(id, head);
+
+        char c;
+        printf("是否继续更改元素？y or n\n");
+        do
+        {
+          c = getchar();
+        } while ('y' != c && 'Y' != c && 'n' != c && 'N' != c);
+
+        if (c == 'y' || c == 'Y')
+        {
+          continue;
+        }
+        else
+        {
+          break;
+        }
+      }
+
+      break;
+
+    case 5:
+      while (1)
+      {
+        int id;
+        printf("请输入要删除的元素id：");
+        scanf("%d", &id);
+        delete_element(id, &head);
+
+        char c;
+        printf("是否继续删除元素？y or n\n");
+        do
+        {
+          c = getchar();
+        } while ('y' != c && 'Y' != c && 'n' != c && 'N' != c);
+
+        if (c == 'y' || c == 'Y')
+        {
+          continue;
+        }
+        else
+        {
+          break;
+        }
+      }
+
+      break;
+
+    case 6:
+      while (1)
+      {
+        int key; // 查询的值
+        struct Link *search = head;
+        printf("输入查询的值：\n");
+        scanf("%d", &key);
+        getchar();
+        if (NULL == (search = search_item(key, search)))
+        {
+          printf("没有对应的信息\n");
+        }
+        else
+        {
+          printf("查询到的信息为：\n");
+          print_element(search);
+          search = search->next;
+          while (NULL != (search = search_item(key, search)))
+          {
+            print_element(search);
+            search = search->next;
+          }
+        }
+
+        char c;
+        printf("是否继续查询？y or n\n");
+        do
+        {
+          c = getchar();
+        } while ('y' != c && 'Y' != c && 'n' != c && 'N' != c);
+
+        if (c == 'y' || c == 'Y')
+        {
+          continue;
+        }
+        else
+        {
+          break;
+        }
+      }
+      break;
+
+    case 7:
       printf("打印链表：\n");
       print_all(head);
       printf("按Enter继续...");
