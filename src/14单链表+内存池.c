@@ -1,16 +1,16 @@
 /**
- * @file 13单链表.c
+ * @file 14单链表+内存池.c
  * @author Nie Yan
  * @brief 
- * 用结构体实现一个单链表，存放一串数字，并实现增改删查操作。
- * 注意指针的使用，记住一点，在main函数中的变量，需要在子函数中操作并改变，子函数中一定要通过指针来操作。
- * 例如在子函数中释放main函数中head指针指向的链表结构的内存，就需要传递head指针的地址来操作。
+ * 1. 在13单链表的基础上加入内存池
+ *    内存池也是一个链表，它的目的是防止程序运行中频繁申请和释放空间造成内存空间碎片化，
+ *    通过在程序内部循环使用一部分内存空间，来减少内存的申请与释放。
+ * 2. 修改了单链表的交互方式，采用字符命令；修改了读取单个字符的方式，
+ *    代码中出现了两种安全读取单个字符的方法，需要理解记忆,
+ *    主要理解丢弃输入缓冲区不必要的字符的方法
  * @version 0.1
- * @date 2021-03-23(creat)
+ * @date 2021-03-27(creat)
  * @date 2021-03-28(last-chage)
- * 3-28 fixed bugs：
- * 1. input_data中id无条件自增
- * 2. 退出程序选项没有释放内存直接退出程序
  * 
  * @copyright Copyright (c) 2021
  * 
@@ -18,6 +18,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+
+// 内存池的容量(以内存块为单位)
+#define MAX 2
+// 为了方便验证而设置了较小的值，在实际中内存池需要根具实际情况设计大小
 
 /**
  * @brief 链表数据结构
@@ -33,16 +37,24 @@ struct Link
   struct Link *next;
 };
 
+// 内存池
+struct Link *pool = NULL;
+int count = 0; // 内存池中的内存块数量
+
 void input_data(struct Link *);
+struct Link *pull_mem(void);
 void add_element_h(struct Link **);
 void add_element_t(struct Link **);
 struct Link *search_item(int, struct Link *);
 void insert_element(int, struct Link **);
 void change_item(int, struct Link *);
+void push_mem(struct Link **);
 void delete_element(int, struct Link **);
 void print_element(struct Link *);
 void print_all(struct Link *);
+void print_help(void);
 void release(struct Link **);
+void release_pool(void);
 
 /**
  * @brief 输入数据项
@@ -59,9 +71,38 @@ void input_data(struct Link *new_num)
   }
   printf("请输入要存放的数字：\n");
   printf("num = ");
+  // 安全读取
   scanf("%d", &(new_num->num));
-  //丢弃一个回车符
-  getchar();
+  while (getchar() != '\n')
+    ; // 丢弃缓冲区的回车符
+}
+
+/**
+ * @brief 分配内存空间。判断内存池中是否有块空间，有则取出作为存放新的链表元素的空间，没有就用calloc新申请
+ * 
+ * @return struct Link* 新分配的内存空间指针
+ */
+struct Link *pull_mem(void)
+{
+  struct Link *new_mem = NULL;
+  if (pool != NULL)
+  {
+    new_mem = pool;
+    pool = pool->next;
+    count--;
+  }
+  else
+  {
+    // 新建的数据不能放在栈空间，要存放在堆空间，否则函数结束值就丢失了
+    new_mem = (struct Link *)calloc(1, sizeof(struct Link)); // 使用calloc分配内存并初始化为0
+    if (NULL == new_mem)
+    {
+      printf("内存分配失败，按任意键程序退出...");
+      getchar();
+      exit(-1);
+    }
+  }
+  return new_mem;
 }
 
 /**
@@ -77,17 +118,12 @@ void add_element_h(struct Link **head)
    */
   struct Link *new_num = NULL, *temp = NULL;
 
-  // 新建的数据不能放在栈空间，要存放在堆空间，否则函数结束值就丢失了
-  new_num = (struct Link *)calloc(1, sizeof(struct Link)); // 使用calloc分配内存并初始化为0
-  if (NULL == new_num)
-  {
-    printf("内存分配失败，按任意键程序退出...");
-    getchar();
-    exit(-1);
-  }
+  // 分配内存空间
+  new_num = pull_mem();
 
   //输入数据
   input_data(new_num);
+  print_element(new_num);
 
   if (NULL == *head)
   {
@@ -123,15 +159,11 @@ void add_element_t(struct Link **head)
     tail = temp;
   }
 
-  new_num = (struct Link *)calloc(1, sizeof(struct Link));
-  if (NULL == new_num)
-  {
-    printf("内存分配失败，按任意键退出...\n");
-    getchar();
-    exit(-1);
-  }
+  // 分配内存空间
+  new_num = pull_mem();
 
   input_data(new_num);
+  print_element(new_num);
 
   if (NULL == *head)
   {
@@ -185,13 +217,9 @@ void insert_element(int id, struct Link **head)
     curr = curr->next;
   }
 
-  new = (struct Link *)calloc(1, sizeof(struct Link));
-  if (NULL == new)
-  {
-    printf("内存分配失败，按任意键结束...");
-    getchar();
-    exit(-1);
-  }
+  // 分配内存空间
+  new = pull_mem();
+
   input_data(new);
 
   if (curr == NULL)
@@ -244,6 +272,38 @@ void change_item(int id, struct Link *head)
 }
 
 /**
+ * @brief 回收内存。判断内存池是否有空间，有就使用头插法将删除的元素放入内存池，没有就free内存
+ * 
+ * @param curr 要回收的内存的指针的指针，因为可能要释放内存指针本身，所以要操作其地址
+ */
+void push_mem(struct Link **curr)
+{
+  struct Link *temp = *curr;
+  // 将curr的id初始化为0
+  temp->id = 0;
+  if (count < MAX)
+  {
+    if (pool == NULL)
+    {
+      pool = temp;
+      temp->next = NULL;
+    }
+    else
+    {
+      temp->next = pool;
+      pool = temp;
+    }
+    count++;
+    printf("删除成功，放入内存池\n");
+  }
+  else
+  {
+    free(*curr);
+    printf("删除成功，释放内存\n");
+  }
+}
+
+/**
  * @brief 删除id对应的元素
  * 
  * @param id 元素id
@@ -274,8 +334,8 @@ void delete_element(int id, struct Link **head)
   {
     prev->next = curr->next;
   }
-  free(curr);
-  printf("删除成功\n");
+
+  push_mem(&curr);
 }
 
 /**
@@ -291,7 +351,7 @@ void print_element(struct Link *element)
   }
   else
   {
-    printf("%p: {%d : %d} -> %p \n", element, element->id, element->num, element->next);
+    printf("%p: {%3d : %-6d} -> %p \n", element, element->id, element->num, element->next);
   }
 }
 
@@ -311,6 +371,24 @@ void print_all(struct Link *head)
 }
 
 /**
+ * @brief 打印命令帮助信息
+ * 
+ */
+void print_help(void)
+{
+  printf("\
+          a 添加新元素（头插法）\n\
+          t 添加新元素（尾插法）\n\
+          i 插入元素\n\
+          c 更改某个元素的数据项\n\
+          d 删除某个元素\n\
+          s 查询数据项\n\
+          p 打印整个链表\n\
+          h 查看帮助\n\
+          q 退出程序\n");
+}
+
+/**
  * @brief 释放整个链表内存
  * 
  * @param head 链表头指针的地址
@@ -326,45 +404,62 @@ void release(struct Link **head)
   }
 }
 
+/**
+ * @brief 释放内存池空间
+ * 
+ */
+void release_pool(void)
+{
+  struct Link *temp = NULL;
+  while (pool != NULL)
+  {
+    temp = pool->next;
+    free(pool);
+    pool = temp;
+  }
+}
+
 int main(void)
 {
   struct Link *head = NULL; // @brief 链表头指针
   // 链表头指针不使用全局变量是因为全局变量容易被修改，不安全。
   while (1)
   {
-    int num;
-    printf("请输入对应数字：\n\
-            1、添加新元素（头插法）\n\
-            2、添加新元素（尾插法）\n\
-            3、插入元素\n\
-            4、更改某个元素的数据项\n\
-            5、删除某个元素\n\
-            6、查询数据项\n\
-            7、打印整个链表\n\
-            0、退出程序\n");
-    scanf("%d", &num);
-    getchar(); // 丢弃换行符，以免影响后面输入
+    char com; // 命令
+    printf("请输入功能对应字符:(h查看帮助)");
+    // 读取单个字符最安全的方法，输入缓冲区会被清空，以免干扰后续输入
+    scanf("%c", &com); // scanf只读取第一个字符，其他字符被留在缓冲区，包括换行符等
+    while (getchar() != '\n')
+      ; // 通过循环丢弃换行符及其之前的其他字符，以免影响后面输入
 
-    switch (num)
+    switch (com)
     {
+    // 帮助
+    case 'h':
+      print_help();
+      break;
     // 退出程序
-    case 0:
+    case 'q':
       // 因为释放内存需要操作nums地址本身，所以还是要传入nums指针的地址
       release(&head);
+      release_pool();
       return 0;
-      // 头插法
-    case 1:
+    // 头插法
+    case 'a':
       while (1)
       {
         // 因为函数中要修改的是head指针本身的值，所以需要传head指针的地址
         add_element_h(&head);
 
         char c;
-        printf("是否继续添加新的元素？y or n\n");
+        printf("是否继续添加新的元素？(y or n):");
+        // 这是另一种安全的读取单个字符的方法，但是如果循环条件太长就会比较繁琐
         do
         {
           c = getchar();
         } while ('y' != c && 'Y' != c && 'n' != c && 'N' != c);
+        while (getchar() != '\n')
+          ; // 丢弃缓冲区的回车符
 
         if (c == 'y' || c == 'Y')
         {
@@ -377,19 +472,21 @@ int main(void)
       }
       break;
 
-      // 尾插法
-    case 2:
+    // 尾插法
+    case 't':
       while (1)
       {
         // 因为函数中要修改的是head指针本身的值，所以需要传head指针的地址
         add_element_t(&head);
 
         char c;
-        printf("是否继续添加新的元素？y or n\n");
+        printf("是否继续添加新的元素？(y or n):");
         do
         {
           c = getchar();
         } while ('y' != c && 'Y' != c && 'n' != c && 'N' != c);
+        while (getchar() != '\n')
+          ; // 丢弃缓冲区的回车符
 
         if (c == 'y' || c == 'Y')
         {
@@ -402,8 +499,8 @@ int main(void)
       }
       break;
 
-      // 插入数据
-    case 3:
+    // 插入数据
+    case 'i':
       while (1)
       {
         int id;
@@ -413,11 +510,13 @@ int main(void)
         insert_element(id, &head);
 
         char c;
-        printf("是否继续插入元素？y or n\n");
+        printf("是否继续插入元素？(y or n):");
         do
         {
           c = getchar();
         } while ('y' != c && 'Y' != c && 'n' != c && 'N' != c);
+        while (getchar() != '\n')
+          ; // 丢弃缓冲区的回车符
 
         if (c == 'y' || c == 'Y')
         {
@@ -430,8 +529,8 @@ int main(void)
       }
       break;
 
-      // 更改元素
-    case 4:
+    // 更改元素
+    case 'c':
       while (1)
       {
         int id;
@@ -441,11 +540,13 @@ int main(void)
         change_item(id, head);
 
         char c;
-        printf("是否继续更改元素？y or n\n");
+        printf("是否继续更改元素？(y or n):");
         do
         {
           c = getchar();
         } while ('y' != c && 'Y' != c && 'n' != c && 'N' != c);
+        while (getchar() != '\n')
+          ; // 丢弃缓冲区的回车符
 
         if (c == 'y' || c == 'Y')
         {
@@ -459,8 +560,8 @@ int main(void)
 
       break;
 
-      // 删除元素
-    case 5:
+    // 删除元素
+    case 'd':
       while (1)
       {
         int id;
@@ -470,11 +571,13 @@ int main(void)
         delete_element(id, &head);
 
         char c;
-        printf("是否继续删除元素？y or n\n");
+        printf("是否继续删除元素？(y or n):");
         do
         {
           c = getchar();
         } while ('y' != c && 'Y' != c && 'n' != c && 'N' != c);
+        while (getchar() != '\n')
+          ; // 丢弃缓冲区的回车符
 
         if (c == 'y' || c == 'Y')
         {
@@ -487,8 +590,8 @@ int main(void)
       }
       break;
 
-      // 查询元素
-    case 6:
+    // 查询元素
+    case 's':
       while (1)
       {
         int key; // 查询的值
@@ -513,11 +616,13 @@ int main(void)
         }
 
         char c;
-        printf("是否继续查询？y or n\n");
+        printf("是否继续查询？(y or n):");
         do
         {
           c = getchar();
         } while ('y' != c && 'Y' != c && 'n' != c && 'N' != c);
+        while (getchar() != '\n')
+          ; // 丢弃缓冲区的回车符
 
         if (c == 'y' || c == 'Y')
         {
@@ -530,19 +635,19 @@ int main(void)
       }
       break;
 
-      // 打印整个链表
-    case 7:
+    // 打印整个链表
+    case 'p':
       printf("打印链表：\n");
       print_all(head);
       printf("按Enter继续...");
-      getchar();
+      while (getchar() != '\n')
+        ; // 暂停并丢弃缓冲区的回车符
       break;
 
     default:
       continue;
     }
   }
-
 
   return 0;
 }
