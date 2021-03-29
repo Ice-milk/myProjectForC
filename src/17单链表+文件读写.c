@@ -38,7 +38,8 @@ typedef struct LINK
 PLink pool = NULL;
 int count = 0; // 内存池中的内存块数量
 
-void read_from_file(PPLink, FILE *);
+void read_from_byte(PPLink);
+void read_from_csv(PPLink, char *);
 void input_data(PLink);
 PLink pull_mem(void);
 void add_element_h(PPLink);
@@ -50,10 +51,63 @@ void push_mem(PPLink);
 void delete_element(int, PPLink);
 void print_element(PLink);
 void print_all(PLink);
+void store_to_byte(PLink);
+void store_to_csv(PLink, char *);
 void print_help(void);
-void store_to_file(PLink, FILE *);
 void release(PPLink);
 void release_pool(void);
+
+/**
+ * @brief 从data文件读取数据
+ * 
+ * @param head 链表头指针的地址
+ */
+void read_from_byte(PPLink head)
+{
+  FILE *fp = NULL;
+  PLink new_item = NULL; 
+  PLink tail = NULL;
+
+  // 如果链表中已经存在数据，先抹去数据再读入数据
+  if(*head != NULL)
+  {
+    release(head);
+  }
+  if ((fp = fopen("../temp/Link.data", "rb")) == NULL)
+  {
+    fprintf(stderr, "文件读取失败！\n");
+    perror(" ");
+    exit(-1);
+  }
+  // 尾插法读入
+  while (1)
+  {
+    // 申请内存
+    new_item = pull_mem();
+    fread(new_item, sizeof(Link), 1, fp);
+    // 读取到文件末尾，跳出循环
+    if (feof(fp))
+    {
+      break;
+    }
+
+    if (*head == NULL)
+    {
+      *head = new_item;
+    }
+    else
+    {
+      tail->next = new_item;
+    }
+    new_item->next = NULL;
+    tail = new_item;
+  }
+  fclose(fp);
+}
+
+void read_from_csv(PPLink head, char *path)
+{
+}
 
 /**
  * @brief 输入数据项
@@ -382,12 +436,40 @@ void print_all(PLink head)
 }
 
 /**
+ * @brief 将链表存储data文件
+ * 
+ * @param head 链表头指针
+ */
+void store_to_byte(PLink head)
+{
+  FILE *fp = NULL;
+
+  if ((fp = fopen("../temp/Link.data", "wb")) == NULL)
+  {
+    fprintf(stderr, "文件读取失败！\n");
+    exit(-1);
+  }
+
+  while (head != NULL)
+  {
+    fwrite(head, sizeof(Link), 1, fp);
+    head = head->next;
+  }
+  fclose(fp);
+}
+
+void store_to_csv(PLink temp, char *path)
+{
+}
+
+/**
  * @brief 打印命令帮助信息
  * 
  */
 void print_help(void)
 {
   printf("\
+          r 从data文件读取数据\n\
           a 添加新元素（头插法）\n\
           t 添加新元素（尾插法）\n\
           i 插入元素\n\
@@ -395,6 +477,7 @@ void print_help(void)
           d 删除某个元素\n\
           s 查询数据项\n\
           p 打印整个链表\n\
+          S 将数据存储为data文件\n\
           h 查看帮助\n\
           q 退出程序\n");
 }
@@ -458,6 +541,10 @@ int main(void)
       release(&head);
       release_pool();
       return 0;
+    // 从data文件读取数据
+    case 'r':
+      read_from_byte(&head);
+      break;
     // 头插法
     case 'a':
       while (1)
@@ -656,6 +743,11 @@ int main(void)
       printf("按Enter继续...");
       while (getchar() != '\n')
         ; // 暂停并丢弃缓冲区的回车符
+      break;
+
+    // 存储数据到data文件
+    case 'S':
+      store_to_byte(head);
       break;
 
     default:
