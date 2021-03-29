@@ -1,16 +1,11 @@
 /**
- * @file 13单链表.c
+ * @file 13.1单链表typedef.c
  * @author Nie Yan
  * @brief 
- * 用结构体实现一个单链表，存放一串数字，并实现增改删查操作。注意指针的使用，记住一点，在main
- * 函数中的变量，需要在子函数中操作并改变，子函数中一定要通过指针来操作。例如在子函数中释放
- * main函数中head指针指向的链表结构的内存，就需要传递head指针的地址来操作。
+ * 与13单链表相比，使用typedef代替了struct，使代码更清晰简洁
  * @version 0.1
- * @date 2021-03-23(creat)
+ * @date 2021-03-28(creat)
  * @date 2021-03-28(last-change)
- * 3-28 fixed bugs：
- * 1. input_data中id无条件自增
- * 2. 退出程序选项没有释放内存直接退出程序
  * 
  * @copyright Copyright (c) 2021
  * 
@@ -23,33 +18,33 @@
  * @brief 链表数据结构
  * 
  */
-struct Link
+typedef struct LINK
 {
   // 序号
   int id;
   // 数据
   int num;
   // 指向下一个链表元素
-  struct Link *next;
-};
+  struct LINK *next;
+} Link, *PLink, **PPLink;
 
-void input_data(struct Link *);
-void add_element_h(struct Link **);
-void add_element_t(struct Link **);
-struct Link *search_item(int, struct Link *);
-void insert_element(int, struct Link **);
-void change_item(int, struct Link *);
-void delete_element(int, struct Link **);
-void print_element(struct Link *);
-void print_all(struct Link *);
-void release(struct Link **);
+void input_data(PLink);
+void add_element_h(PPLink);
+void add_element_t(PPLink);
+PLink search_item(int, PLink);
+void insert_element(int, PPLink);
+void change_item(int, PLink);
+void delete_element(int, PPLink);
+void print_element(PLink);
+void print_all(PLink);
+void release(PPLink);
 
 /**
  * @brief 输入数据项
  * 
  * @param new_num 新的链表元素
  */
-void input_data(struct Link *new_num)
+void input_data(PLink new_num)
 {
   static int id = 1;
   if (new_num->id == 0)
@@ -69,16 +64,16 @@ void input_data(struct Link *new_num)
  * 
  * @param head 链表头指针的地址
  */
-void add_element_h(struct Link **head)
+void add_element_h(PPLink head)
 {
   /**
    * @param new_num 新建链表元素和缓存
    * @param temp 链表指针缓存
    */
-  struct Link *new_num = NULL, *temp = NULL;
+  PLink new_num = NULL, temp = NULL;
 
   // 新建的数据不能放在栈空间，要存放在堆空间，否则函数结束值就丢失了
-  new_num = (struct Link *)calloc(1, sizeof(struct Link)); // 使用calloc分配内存并初始化为0
+  new_num = (PLink)calloc(1, sizeof(Link)); // 使用calloc分配内存并初始化为0
   if (NULL == new_num)
   {
     printf("内存分配失败，按任意键程序退出...");
@@ -96,9 +91,6 @@ void add_element_h(struct Link **head)
   }
   else
   {
-    // temp = *head;
-    // *head = new_num;
-    // new_num->next = temp;
     new_num->next = *head;
     *head = new_num;
   }
@@ -109,13 +101,13 @@ void add_element_h(struct Link **head)
  * 
  * @param head 链表头指针的地址
  */
-void add_element_t(struct Link **head)
+void add_element_t(PPLink head)
 {
-  struct Link *new_num = NULL;
-  static struct Link *tail = NULL; // 用静态变量记录链表尾部
+  PLink new_num = NULL;
+  static PLink tail = NULL; // 用静态变量记录链表尾部
   if (*head != NULL)
   {
-    struct Link *temp = *head;
+    PLink temp = *head;
     while (temp->next != NULL)
     {
       temp = temp->next;
@@ -123,7 +115,7 @@ void add_element_t(struct Link **head)
     tail = temp;
   }
 
-  new_num = (struct Link *)calloc(1, sizeof(struct Link));
+  new_num = (PLink)calloc(1, sizeof(Link));
   if (NULL == new_num)
   {
     printf("内存分配失败，按任意键退出...\n");
@@ -151,9 +143,9 @@ void add_element_t(struct Link **head)
  * @param head 链表头指针
  * @return struct Link* 返回查询到的链表元素指针
  */
-struct Link *search_item(int key, struct Link *head)
+PLink search_item(int key, PLink head)
 {
-  struct Link *temp = head;
+  PLink temp = head;
   while (NULL != temp)
   {
     if (temp->id == key || temp->num == key)
@@ -173,11 +165,11 @@ struct Link *search_item(int key, struct Link *head)
  * @param id 链表元素序号
  * @param head 链表头指针
  */
-void insert_element(int id, struct Link **head)
+void insert_element(int id, PPLink head)
 {
-  struct Link *prev = NULL;
-  struct Link *curr = *head;
-  struct Link *new;
+  PLink prev = NULL;
+  PLink curr = *head;
+  PLink new = NULL;
 
   while (NULL != curr && curr->id != id)
   {
@@ -185,7 +177,7 @@ void insert_element(int id, struct Link **head)
     curr = curr->next;
   }
 
-  new = (struct Link *)calloc(1, sizeof(struct Link));
+  new = (PLink)calloc(1, sizeof(Link));
   if (NULL == new)
   {
     printf("内存分配失败，按任意键结束...");
@@ -223,9 +215,9 @@ void insert_element(int id, struct Link **head)
  * @param id 元素id
  * @param head 链表头指针
  */
-void change_item(int id, struct Link *head)
+void change_item(int id, PLink head)
 {
-  struct Link *temp = head;
+  PLink temp = head;
   while (temp != NULL && temp->id != id)
   {
     temp = temp->next;
@@ -249,10 +241,10 @@ void change_item(int id, struct Link *head)
  * @param id 元素id
  * @param head 链表首地址
  */
-void delete_element(int id, struct Link **head)
+void delete_element(int id, PPLink head)
 {
-  struct Link *prev = NULL;
-  struct Link *curr = *head;
+  PLink prev = NULL;
+  PLink curr = *head;
 
   while (curr != NULL && curr->id != id)
   {
@@ -283,7 +275,7 @@ void delete_element(int id, struct Link **head)
  * 
  * @param element 链表某个元素的指针
  */
-void print_element(struct Link *element)
+void print_element(PLink element)
 {
   if (NULL == element)
   {
@@ -300,9 +292,9 @@ void print_element(struct Link *element)
  * 
  * @param head 链表头指针
  */
-void print_all(struct Link *head)
+void print_all(PLink head)
 {
-  struct Link *temp = head;
+  PLink temp = head;
   while (temp != NULL)
   {
     print_element(temp);
@@ -315,9 +307,9 @@ void print_all(struct Link *head)
  * 
  * @param head 链表头指针的地址
  */
-void release(struct Link **head)
+void release(PPLink head)
 {
-  struct Link *temp = NULL;
+  PLink temp = NULL;
   while (*head != NULL)
   {
     temp = (*head)->next; // ->优先级比*高，所以要括起来
@@ -328,7 +320,7 @@ void release(struct Link **head)
 
 int main(void)
 {
-  struct Link *head = NULL; // @brief 链表头指针
+  PLink head = NULL; // @brief 链表头指针
   // 链表头指针不使用全局变量是因为全局变量容易被修改，不安全。
   while (1)
   {
@@ -492,7 +484,7 @@ int main(void)
       while (1)
       {
         int key; // 查询的值
-        struct Link *search = head;
+        PLink search = head;
         printf("输入查询的值：\n");
         scanf("%d", &key);
         getchar();
@@ -542,7 +534,6 @@ int main(void)
       continue;
     }
   }
-
 
   return 0;
 }

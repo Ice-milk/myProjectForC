@@ -1,16 +1,20 @@
 /**
- * @file 14单链表+内存池.c
+ * @file 15单链表+内存池.c
  * @author Nie Yan
  * @brief 
- * 1. 在13单链表的基础上加入内存池
- *    内存池也是一个链表，它的目的是防止程序运行中频繁申请和释放空间造成内存空间碎片化，
- *    通过在程序内部循环使用一部分内存空间，来减少内存的申请与释放。
- * 2. 修改了单链表的交互方式，采用字符命令；修改了读取单个字符的方式，
- *    代码中出现了两种安全读取单个字符的方法，需要理解记忆,
- *    主要理解丢弃输入缓冲区不必要的字符的方法
+ * 1. 单链表+内存池
+ * 2. 优化单链表交互和算法
+ * 3. 修改bug
+ * @details
+ * 1. 在13单链表的基础上加入内存池。内存池也是一个链表，它的目的是防止程序运行中频繁申请和
+ *    释放空间造成内存空间碎片化，通过在程序内部循环使用一部分内存空间，来减少内存的申请与
+ *    释放。
+ * 2. 修改了单链表的交互方式，采用字符命令；修改了读取单个字符的方式，代码中出现了两种安全
+ *    读取单个字符的方法，需要理解记忆,主要理解丢弃输入缓冲区不必要的字符的方法;修改了尾插
+ *    法中保证tail始终指向链表尾部的算法，避免每次插入都要遍历整张链表；
  * @version 0.1
  * @date 2021-03-27(creat)
- * @date 2021-03-28(last-chage)
+ * @date 2021-03-28(last-change)
  * 
  * @copyright Copyright (c) 2021
  * 
@@ -27,33 +31,33 @@
  * @brief 链表数据结构
  * 
  */
-struct Link
+typedef struct LINK
 {
   // 序号
   int id;
   // 数据
   int num;
   // 指向下一个链表元素
-  struct Link *next;
-};
+  struct LINK *next;
+} Link, *PLink, **PPLink;
 
 // 内存池
-struct Link *pool = NULL;
+PLink pool = NULL;
 int count = 0; // 内存池中的内存块数量
 
-void input_data(struct Link *);
-struct Link *pull_mem(void);
-void add_element_h(struct Link **);
-void add_element_t(struct Link **);
-struct Link *search_item(int, struct Link *);
-void insert_element(int, struct Link **);
-void change_item(int, struct Link *);
-void push_mem(struct Link **);
-void delete_element(int, struct Link **);
-void print_element(struct Link *);
-void print_all(struct Link *);
+void input_data(PLink);
+PLink pull_mem(void);
+void add_element_h(PPLink);
+void add_element_t(PPLink);
+PLink search_item(int, PLink);
+void insert_element(int, PPLink);
+void change_item(int, PLink);
+void push_mem(PPLink);
+void delete_element(int, PPLink);
+void print_element(PLink);
+void print_all(PLink);
 void print_help(void);
-void release(struct Link **);
+void release(PPLink);
 void release_pool(void);
 
 /**
@@ -61,7 +65,7 @@ void release_pool(void);
  * 
  * @param new_num 新的链表元素
  */
-void input_data(struct Link *new_num)
+void input_data(PLink new_num)
 {
   static int id = 1;
   if (new_num->id == 0)
@@ -80,11 +84,11 @@ void input_data(struct Link *new_num)
 /**
  * @brief 分配内存空间。判断内存池中是否有块空间，有则取出作为存放新的链表元素的空间，没有就用calloc新申请
  * 
- * @return struct Link* 新分配的内存空间指针
+ * @return PLink 新分配的内存空间指针
  */
-struct Link *pull_mem(void)
+PLink pull_mem(void)
 {
-  struct Link *new_mem = NULL;
+  PLink new_mem = NULL;
   if (pool != NULL)
   {
     new_mem = pool;
@@ -94,7 +98,7 @@ struct Link *pull_mem(void)
   else
   {
     // 新建的数据不能放在栈空间，要存放在堆空间，否则函数结束值就丢失了
-    new_mem = (struct Link *)calloc(1, sizeof(struct Link)); // 使用calloc分配内存并初始化为0
+    new_mem = (PLink)calloc(1, sizeof(Link)); // 使用calloc分配内存并初始化为0
     if (NULL == new_mem)
     {
       printf("内存分配失败，按任意键程序退出...");
@@ -110,13 +114,10 @@ struct Link *pull_mem(void)
  * 
  * @param head 链表头指针的地址
  */
-void add_element_h(struct Link **head)
+void add_element_h(PPLink head)
 {
-  /**
-   * @param new_num 新建链表元素和缓存
-   * @param temp 链表指针缓存
-   */
-  struct Link *new_num = NULL, *temp = NULL;
+  // 新建链表元素
+  PLink new_num = NULL;
 
   // 分配内存空间
   new_num = pull_mem();
@@ -132,9 +133,6 @@ void add_element_h(struct Link **head)
   }
   else
   {
-    // temp = *head;
-    // *head = new_num;
-    // new_num->next = temp;
     new_num->next = *head;
     *head = new_num;
   }
@@ -145,19 +143,10 @@ void add_element_h(struct Link **head)
  * 
  * @param head 链表头指针的地址
  */
-void add_element_t(struct Link **head)
+void add_element_t(PPLink head)
 {
-  struct Link *new_num = NULL;
-  static struct Link *tail = NULL; // 用静态变量记录链表尾部
-  if (*head != NULL)
-  {
-    struct Link *temp = *head;
-    while (temp->next != NULL)
-    {
-      temp = temp->next;
-    }
-    tail = temp;
-  }
+  PLink new_num = NULL;
+  static PLink tail = NULL; // 用静态变量记录链表尾部
 
   // 分配内存空间
   new_num = pull_mem();
@@ -165,15 +154,41 @@ void add_element_t(struct Link **head)
   input_data(new_num);
   print_element(new_num);
 
-  if (NULL == *head)
+  /**
+   * 分支情况分析：
+   * head tail tail->next
+   * NULL  -       -      首地址插入
+   *  1   NULL     -      需要从首地址遍历到链表的尾部
+   *  1    1       1      tail不是尾部，遍历到尾部
+   * 
+   */
+  if (*head == NULL)
   {
     *head = new_num;
+    new_num->next = NULL;
   }
   else
   {
+    // 更新当前的链表尾部tail
+    if (tail == NULL)
+    {
+      tail = *head;
+      while (tail->next != NULL)
+      {
+        tail = tail->next;
+      }
+    }
+    else if (tail->next != NULL)
+    {
+      while (tail->next != NULL)
+      {
+        tail = tail->next;
+      }
+    }
+
     tail->next = new_num;
+    new_num->next = NULL;
   }
-  new_num->next = NULL;
   tail = new_num; // 尾指针始终指向链表尾部
 };
 
@@ -181,11 +196,11 @@ void add_element_t(struct Link **head)
  * @brief 输入数据，查询含有相同数据项的所有数据元素并返回其指针
  * @param key 查询的数据
  * @param head 链表头指针
- * @return struct Link* 返回查询到的链表元素指针
+ * @return PLink 返回查询到的链表元素指针
  */
-struct Link *search_item(int key, struct Link *head)
+PLink search_item(int key, PLink head)
 {
-  struct Link *temp = head;
+  PLink temp = head;
   while (NULL != temp)
   {
     if (temp->id == key || temp->num == key)
@@ -203,13 +218,13 @@ struct Link *search_item(int key, struct Link *head)
  * @brief 在id号前插入元素
  * 
  * @param id 链表元素序号
- * @param head 链表头指针
+ * @param head 链表头指针的地址
  */
-void insert_element(int id, struct Link **head)
+void insert_element(int id, PPLink head)
 {
-  struct Link *prev = NULL;
-  struct Link *curr = *head;
-  struct Link *new;
+  PLink prev = NULL;
+  PLink curr = *head;
+  PLink new = NULL;
 
   while (NULL != curr && curr->id != id)
   {
@@ -251,9 +266,9 @@ void insert_element(int id, struct Link **head)
  * @param id 元素id
  * @param head 链表头指针
  */
-void change_item(int id, struct Link *head)
+void change_item(int id, PLink head)
 {
-  struct Link *temp = head;
+  PLink temp = head;
   while (temp != NULL && temp->id != id)
   {
     temp = temp->next;
@@ -276,9 +291,9 @@ void change_item(int id, struct Link *head)
  * 
  * @param curr 要回收的内存的指针的指针，因为可能要释放内存指针本身，所以要操作其地址
  */
-void push_mem(struct Link **curr)
+void push_mem(PPLink curr)
 {
-  struct Link *temp = *curr;
+  PLink temp = *curr;
   // 将curr的id初始化为0
   temp->id = 0;
   if (count < MAX)
@@ -307,12 +322,12 @@ void push_mem(struct Link **curr)
  * @brief 删除id对应的元素
  * 
  * @param id 元素id
- * @param head 链表首地址
+ * @param head 链表头指针的地址
  */
-void delete_element(int id, struct Link **head)
+void delete_element(int id, PPLink head)
 {
-  struct Link *prev = NULL;
-  struct Link *curr = *head;
+  PLink prev = NULL;
+  PLink curr = *head;
 
   while (curr != NULL && curr->id != id)
   {
@@ -335,6 +350,7 @@ void delete_element(int id, struct Link **head)
     prev->next = curr->next;
   }
 
+  // 回收curr
   push_mem(&curr);
 }
 
@@ -343,7 +359,7 @@ void delete_element(int id, struct Link **head)
  * 
  * @param element 链表某个元素的指针
  */
-void print_element(struct Link *element)
+void print_element(PLink element)
 {
   if (NULL == element)
   {
@@ -360,9 +376,9 @@ void print_element(struct Link *element)
  * 
  * @param head 链表头指针
  */
-void print_all(struct Link *head)
+void print_all(PLink head)
 {
-  struct Link *temp = head;
+  PLink temp = head;
   while (temp != NULL)
   {
     print_element(temp);
@@ -393,9 +409,9 @@ void print_help(void)
  * 
  * @param head 链表头指针的地址
  */
-void release(struct Link **head)
+void release(PPLink head)
 {
-  struct Link *temp = NULL;
+  PLink temp = NULL;
   while (*head != NULL)
   {
     temp = (*head)->next; // ->优先级比*高，所以要括起来
@@ -410,7 +426,7 @@ void release(struct Link **head)
  */
 void release_pool(void)
 {
-  struct Link *temp = NULL;
+  PLink temp = NULL;
   while (pool != NULL)
   {
     temp = pool->next;
@@ -421,7 +437,7 @@ void release_pool(void)
 
 int main(void)
 {
-  struct Link *head = NULL; // @brief 链表头指针
+  PLink head = NULL; // 链表头指针
   // 链表头指针不使用全局变量是因为全局变量容易被修改，不安全。
   while (1)
   {
@@ -595,7 +611,7 @@ int main(void)
       while (1)
       {
         int key; // 查询的值
-        struct Link *search = head;
+        PLink search = head;
         printf("输入查询的值：\n");
         scanf("%d", &key);
         getchar();
