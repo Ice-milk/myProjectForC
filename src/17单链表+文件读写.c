@@ -15,6 +15,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 // 内存池的容量(以内存块为单位)
 #define MAX 2
@@ -65,8 +66,9 @@ void release_pool(void);
 void read_from_byte(PPLink head)
 {
   FILE *fp = NULL;
-  PLink new_item = NULL; 
+  PLink new_element = NULL; 
   PLink tail = NULL;
+  int id = 0;
 
   // 如果链表中已经存在数据，先抹去数据再读入数据
   if(*head != NULL)
@@ -83,8 +85,11 @@ void read_from_byte(PPLink head)
   while (1)
   {
     // 申请内存
-    new_item = pull_mem();
-    fread(new_item, sizeof(Link), 1, fp);
+    new_element = pull_mem();
+    fread(new_element, sizeof(Link), 1, fp);
+    new_element->id = id;
+    id++;
+
     // 读取到文件末尾，跳出循环
     if (feof(fp))
     {
@@ -93,20 +98,63 @@ void read_from_byte(PPLink head)
 
     if (*head == NULL)
     {
-      *head = new_item;
+      *head = new_element;
     }
     else
     {
-      tail->next = new_item;
+      tail->next = new_element;
     }
-    new_item->next = NULL;
-    tail = new_item;
+    new_element->next = NULL;
+    tail = new_element;
   }
   fclose(fp);
 }
 
 void read_from_csv(PPLink head, char *path)
 {
+  FILE *fp = NULL;
+  PLink new_element = NULL;
+  PLink tail = NULL;
+  int id = 0;
+
+  if (*head != NULL)
+  {
+    release(head);
+  }
+
+  if ((fp = fopen(path, "rb")) == NULL)
+  {
+    fprintf(stderr, "文件读取失败！\n");
+    perror(" ");
+    exit(-1);
+  }
+
+  char line[1024];
+  char *result = NULL;
+  while((fgets(line, 1024, fp)) != NULL)
+  {
+    result = strtok(line, ",");
+    while(result != NULL)
+    {
+      new_element = pull_mem();
+      new_element->id = id;
+      id++;
+      new_element->num = atoi(result);
+
+      if (*head == NULL)
+      {
+        *head = new_element;
+      }
+      else
+      {
+        tail->next = new_element;
+      }
+      new_element->next = NULL;
+      tail = new_element;
+      result = strtok(NULL, ",");
+    }
+  }
+  fclose(fp);
 }
 
 /**
@@ -458,8 +506,22 @@ void store_to_byte(PLink head)
   fclose(fp);
 }
 
-void store_to_csv(PLink temp, char *path)
+void store_to_csv(PLink head, char *path)
 {
+  FILE *fp = NULL;
+
+  if ((fp = fopen(path, "w")) == NULL)
+  {
+    printf("文件读取失败！\n");
+    exit(-1);
+  }
+
+  while(head != NULL)
+  {
+    fprintf(fp, "%d,", head->num);
+    head = head->next;
+  }
+  fclose(fp);
 }
 
 /**
@@ -470,6 +532,7 @@ void print_help(void)
 {
   printf("\
           r 从data文件读取数据\n\
+          R 从csv文件读取数据\n\
           a 添加新元素（头插法）\n\
           t 添加新元素（尾插法）\n\
           i 插入元素\n\
@@ -477,7 +540,8 @@ void print_help(void)
           d 删除某个元素\n\
           s 查询数据项\n\
           p 打印整个链表\n\
-          S 将数据存储为data文件\n\
+          D 将数据存储为data文件\n\
+          C 将数据存储为csv文件\n\
           h 查看帮助\n\
           q 退出程序\n");
 }
@@ -544,6 +608,10 @@ int main(void)
     // 从data文件读取数据
     case 'r':
       read_from_byte(&head);
+      break;
+    // 从csv文件读取数据
+    case 'R':
+      read_from_csv(&head, "../temp/Link.csv");
       break;
     // 头插法
     case 'a':
@@ -746,8 +814,12 @@ int main(void)
       break;
 
     // 存储数据到data文件
-    case 'S':
+    case 'D':
       store_to_byte(head);
+      break;
+    // 存储数据到csv文件
+    case 'C':
+      store_to_csv(head, "../temp/Link.csv");
       break;
 
     default:
