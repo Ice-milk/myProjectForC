@@ -8,11 +8,13 @@ void haloi(int n, char x, char y, char z);
 
 void haloi(int n, char x, char y, char z)
 {
+  // 基线条件
   if (n == 1)
   {
     printf("%c --> %c\n", x, z); //将最上层圆盘移动到z
     count++;
   }
+  // 递归条件
   else
   {
     // 要将n个圆盘从x借助y移动到z

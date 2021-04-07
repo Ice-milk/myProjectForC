@@ -4,10 +4,12 @@ unsigned long long factorial(int);
 
 unsigned long long factorial(int num)
 {
+  // 基线条件
   if (num == 1)
   {
     return 1;
   }
+  // 递归条件
   return num * factorial(num-1); 
 }
 
